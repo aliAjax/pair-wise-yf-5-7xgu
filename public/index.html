@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>社区保鲜柜预约</title>
+<style>
+  :root { --brand:#0f766e; --bg:#f8fafc; --line:#e2e8f0; --warn:#b45309; --bad:#b91c1c; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:-apple-system,"PingFang SC","Noto Sans SC",sans-serif; background:var(--bg); color:#1e293b; }
+  header { background:var(--brand); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:9; }
+  header h1 { font-size:17px; }
+  header p { font-size:12px; opacity:.85; margin-top:2px; }
+  main { max-width:560px; margin:0 auto; padding:12px 12px 90px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:15px; margin-bottom:10px; }
+  label { display:block; font-size:13px; color:#475569; margin:10px 0 4px; }
+  input,select { width:100%; padding:11px 12px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  button { width:100%; padding:12px; font-size:16px; border:0; border-radius:8px; background:var(--brand); color:#fff; margin-top:14px; }
+  button:disabled { opacity:.5; }
+  .btn-ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  .btn-danger { background:#fff; color:var(--bad); border:1px solid var(--bad); width:auto; padding:6px 12px; font-size:13px; margin:0; }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; }
+  .tabs button { flex:1; margin:0; padding:10px; background:#e2e8f0; color:#334155; font-size:14px; }
+  .tabs button.on { background:var(--brand); color:#fff; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .cell { border:1px solid var(--line); border-radius:8px; padding:10px; font-size:13px; }
+  .cell.free { border-color:#86efac; background:#f0fdf4; cursor:pointer; }
+  .cell.busy { border-color:#fca5a5; background:#fef2f2; }
+  .cell.sel { outline:2px solid var(--brand); }
+  .cell b { display:block; font-size:14px; margin-bottom:2px; }
+  .cell .who { color:var(--bad); }
+  .slotname { font-size:13px; font-weight:600; margin:12px 0 6px; color:#0f766e; }
+  .daypick { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+  .daypick button { flex:0 0 auto; width:auto; margin:0; padding:8px 12px; font-size:13px; background:#fff; color:#334155; border:1px solid var(--line); }
+  .daypick button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; }
+  .t-active { background:#dcfce7; color:#166534; }
+  .t-redeemed { background:#e0e7ff; color:#3730a3; }
+  .t-released { background:#fef3c7; color:#92400e; }
+  .t-cancelled { background:#f1f5f9; color:#64748b; }
+  .rec { border-top:1px solid var(--line); padding:10px 0; font-size:14px; }
+  .rec:first-of-type { border-top:0; }
+  .rec .code { font-size:22px; font-weight:700; letter-spacing:4px; color:var(--brand); }
+  .muted { color:#64748b; font-size:12px; }
+  .msg { padding:10px 12px; border-radius:8px; font-size:14px; margin-bottom:12px; display:none; }
+  .msg.err { display:block; background:#fef2f2; color:var(--bad); border:1px solid #fecaca; }
+  .msg.ok { display:block; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+  .quota { font-size:13px; color:var(--warn); margin-top:8px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .filters button { width:auto; margin:0; padding:6px 12px; font-size:13px; background:#fff; color:#334155; border:1px solid var(--line); }
+  .filters button.on { background:var(--brand); color:#fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🥬 社区共享厨房 · 保鲜柜预约</h1>
+  <p>选日期、时段与冷藏/冷冻层，取餐时向管理员出示六位码</p>
+</header>
+<main>
+  <div class="tabs">
+    <button id="tab-book" class="on" onclick="showTab('book')">预约格子</button>
+    <button id="tab-mine" onclick="showTab('mine')">我的预约</button>
+    <button id="tab-admin" onclick="showTab('admin')">管理员</button>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <!-- 预约 -->
+  <section id="page-book">
+    <div class="card">
+      <h2>住户信息</h2>
+      <label>住户（门牌/姓名）</label>
+      <input id="household" placeholder="如 3栋502 王阿姨" onchange="saveHousehold()">
+      <div class="quota" id="quota"></div>
+    </div>
+    <div class="card">
+      <h2>选择日期与格子</h2>
+      <div class="daypick" id="daypick"></div>
+      <div id="grid"></div>
+      <label>餐盒数量</label>
+      <input id="boxCount" type="number" min="1" max="20" value="1" inputmode="numeric">
+      <button id="submitBtn" onclick="book()" disabled>请先选择一个空格</button>
+    </div>
+  </section>
+
+  <!-- 我的预约 -->
+  <section id="page-mine" style="display:none">
+    <div class="card"><h2>我的预约记录</h2><div id="mineList"><p class="muted">暂无记录</p></div></div>
+  </section>
+
+  <!-- 管理员 -->
+  <section id="page-admin" style="display:none">
+    <div class="card">
+      <h2>取餐核销</h2>
+      <label>管理员口令</label>
+      <input id="adminKey" type="password" placeholder="管理员口令" onchange="localStorage.adminKey=this.value">
+      <label>住户出示的六位码</label>
+      <input id="redeemCode" inputmode="numeric" maxlength="6" placeholder="6 位数字">
+      <button onclick="redeem()">核销取餐</button>
+    </div>
+    <div class="card">
+      <h2>全部记录</h2>
+      <div class="filters" id="statusFilters">
+        <button data-s="" class="on" onclick="loadAdmin('')">全部</button>
+        <button data-s="active" onclick="loadAdmin('active')">进行中</button>
+        <button data-s="redeemed" onclick="loadAdmin('redeemed')">已核销</button>
+        <button data-s="released" onclick="loadAdmin('released')">超时释放</button>
+        <button data-s="cancelled" onclick="loadAdmin('cancelled')">已取消</button>
+      </div>
+      <div id="adminList"><p class="muted">输入口令后自动加载</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const SLOT_LABEL = { morning:'早餐 07:00-10:00', noon:'午餐 11:00-14:00', evening:'晚餐 17:00-20:00' };
+const STATUS_LABEL = { active:'进行中', redeemed:'已核销', released:'超时释放', cancelled:'已取消' };
+let state = null, selDate = null, sel = null;
+
+$('household').value = localStorage.household || '';
+$('adminKey').value = localStorage.adminKey || '';
+
+function saveHousehold(){ localStorage.household = $('household').value.trim(); refresh(); }
+function toast(text, ok){ const m=$('msg'); m.textContent=text; m.className='msg '+(ok?'ok':'err'); clearTimeout(m._t); m._t=setTimeout(()=>m.className='msg', 4000); }
+function showTab(t){
+  for (const x of ['book','mine','admin']) { $('page-'+x).style.display = x===t?'':'none'; $('tab-'+x).classList.toggle('on', x===t); }
+  if (t==='mine') renderMine();
+  if (t==='admin' && $('adminKey').value) loadAdmin('');
+}
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const data = await r.json();
+  if (!r.ok) { const e = new Error(data.error||'请求失败'); e.data=data; throw e; }
+  return data;
+}
+
+async function refresh(){
+  const hh = encodeURIComponent($('household').value.trim());
+  state = await api('/api/state?household='+hh);
+  renderDays(); renderGrid(); renderQuota();
+}
+function renderQuota(){
+  $('quota').textContent = $('household').value.trim()
+    ? `未来预约额度：已用 ${state.futureUsed} / ${state.maxFuture}` : '';
+}
+function renderDays(){
+  if (!selDate) selDate = state.days[0].date;
+  $('daypick').innerHTML = state.days.map(d=>{
+    const wd = '日一二三四五六'[new Date(d.date+'T00:00').getDay()];
+    return `<button class="${d.date===selDate?'on':''}" onclick="pickDate('${d.date}')">${d.date.slice(5)} 周${wd}</button>`;
+  }).join('');
+}
+function pickDate(d){ selDate=d; sel=null; renderDays(); renderGrid(); updateBtn(); }
+function renderGrid(){
+  const day = state.days.find(d=>d.date===selDate);
+  $('grid').innerHTML = day.slots.map(s=>`
+    <div class="slotname">${s.label}</div>
+    <div class="grid">${s.layers.map(l=>{
+      const key = `${day.date}|${s.id}|${l.layer}`;
+      const cls = l.occupied?'busy':'free'+(sel===key?' sel':'');
+      const inner = l.occupied
+        ? `<b>${l.layer}层 · 已占用</b><span class="who">${l.occupiedBy}</span><br><span class="muted">至 ${l.occupiedEnd} 结束</span>`
+        : `<b>${l.layer}层 · 空闲</b><span class="muted">点击选择</span>`;
+      return `<div class="cell ${cls}" ${l.occupied?'':`onclick="pickCell('${key}')"`}>${inner}</div>`;
+    }).join('')}</div>`).join('');
+}
+function pickCell(key){ sel = sel===key?null:key; renderGrid(); updateBtn(); }
+function updateBtn(){
+  const btn = $('submitBtn');
+  btn.disabled = !sel;
+  if (sel) { const [d,s,l] = sel.split('|'); btn.textContent = `预约 ${d} ${SLOT_LABEL[s]} ${l}层`; }
+  else btn.textContent = '请先选择一个空格';
+}
+
+async function book(){
+  const household = $('household').value.trim();
+  if (!household) return toast('请先填写住户（门牌/姓名）');
+  if (!sel) return toast('请先选择一个空格');
+  const [date, slot, layer] = sel.split('|');
+  try {
+    const r = await api('/api/reservations', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ household, date, slot, layer, boxCount: $('boxCount').value }) });
+    sel = null;
+    toast(`预约成功！取餐核销码：${r.code}（请截图保存）`, true);
+    await refresh();
+  } catch (e) {
+    if (e.data && e.data.occupiedBy) toast(`该格子已被 ${e.data.occupiedBy} 占用，至 ${e.data.occupiedEnd} 结束，请另选`);
+    else toast(e.message);
+    await refresh();
+  }
+}
+
+function renderMine(){
+  const list = state ? state.mine : [];
+  $('mineList').innerHTML = list.length ? list.map(r=>`
+    <div class="rec">
+      <div class="row"><b>${r.date} ${SLOT_LABEL[r.slot]} · ${r.layer}层 × ${r.boxCount}盒</b>
+      <span class="tag t-${r.status}">${STATUS_LABEL[r.status]}</span></div>
+      ${r.status==='active' ? `<div class="code">${r.code}</div><div class="muted">取餐时出示此码 · 至 ${r.endTime}（超时2小时自动释放）</div>
+        <div style="margin-top:6px"><button class="btn-danger" onclick="cancelOne('${r.id}')">取消预约</button></div>` : ''}
+      ${r.status==='redeemed' ? `<div class="muted">已于 ${fmt(r.redeemedAt)} 核销取餐</div>` : ''}
+      ${r.status==='released' ? `<div class="muted">超时未核销，格子已于 ${fmt(r.releasedAt)} 释放</div>` : ''}
+    </div>`).join('') : '<p class="muted">暂无记录</p>';
+}
+async function cancelOne(id){
+  try {
+    await api('/api/cancel', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, household: $('household').value.trim() }) });
+    toast('已取消', true); await refresh(); renderMine();
+  } catch (e) { toast(e.message); }
+}
+
+async function redeem(){
+  try {
+    const r = await api('/api/redeem', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ adminKey: $('adminKey').value, code: $('redeemCode').value }) });
+    toast(`核销成功：${r.household} ${r.date} ${SLOT_LABEL[r.slot]} ${r.layer}层 × ${r.boxCount}盒`, true);
+    $('redeemCode').value=''; loadAdmin('');
+  } catch (e) { toast(e.message); }
+}
+async function loadAdmin(status){
+  document.querySelectorAll('#statusFilters button').forEach(b=>b.classList.toggle('on', b.dataset.s===status));
+  try {
+    const list = await api('/api/admin/records?adminKey='+encodeURIComponent($('adminKey').value)+'&status='+status);
+    $('adminList').innerHTML = list.length ? list.map(r=>`
+      <div class="rec">
+        <div class="row"><b>${r.household}</b><span class="tag t-${r.status}">${STATUS_LABEL[r.status]}</span></div>
+        <div>${r.date} ${SLOT_LABEL[r.slot]} · ${r.layer}层 × ${r.boxCount}盒 · 码 ${r.code}</div>
+        <div class="muted">预约于 ${fmt(r.createdAt)}${r.redeemedAt?' · 核销于 '+fmt(r.redeemedAt):''}${r.releasedAt?' · 释放于 '+fmt(r.releasedAt):''}</div>
+      </div>`).join('') : '<p class="muted">无记录</p>';
+  } catch (e) { $('adminList').innerHTML = `<p class="muted">${e.message}</p>`; }
+}
+function fmt(iso){ return iso ? iso.replace('T',' ').slice(0,16) : ''; }
+
+refresh().catch(e=>toast(e.message));
+setInterval(()=>refresh().catch(()=>{}), 30000); // 每30秒同步占用状态
+</script>
+</body>
+</html>
