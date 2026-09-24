@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0e9f8a" />
+<title>社区共享厨房 · 保鲜柜预约</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">🥗</span>
+      <div>
+        <h1>保鲜柜预约</h1>
+        <p>社区共享厨房 · 冷藏 / 冷冻格子</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ========== 预约页 ========== -->
+    <section class="page" id="page-booking">
+      <div class="card">
+        <h2 class="card-title">填写预约信息</h2>
+        <div class="field">
+          <label for="bkRoom">房号 <em>*</em></label>
+          <input id="bkRoom" type="text" inputmode="numeric" placeholder="如 3-201" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="bkName">住户姓名 <em>*</em></label>
+          <input id="bkName" type="text" placeholder="如 王阿姨" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="bkDate">日期</label>
+          <input id="bkDate" type="date" />
+        </div>
+        <div class="field">
+          <label>时段</label>
+          <div class="slot-list" id="slotList"></div>
+        </div>
+        <div class="field">
+          <label>柜层</label>
+          <div class="seg" id="typeSeg">
+            <button type="button" class="seg-btn" data-type="fridge">❄️ 冷藏层</button>
+            <button type="button" class="seg-btn" data-type="freezer">🧊 冷冻层</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>餐盒数量（每盒占 1 格，最多 6 盒）</label>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-action="boxesDec">−</button>
+            <span id="boxesVal">1</span>
+            <button type="button" class="step-btn" data-action="boxesInc">＋</button>
+            <span class="avail" id="availText"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">格子占用情况</h2>
+        <div class="legend">
+          <span><i class="dot dot-free"></i>空闲</span>
+          <span><i class="dot dot-pre"></i>本次预选</span>
+          <span><i class="dot dot-occ"></i>已占用（点击查看）</span>
+        </div>
+        <div class="cabinet" id="cabinet"></div>
+        <p class="hint" id="cabinetHint"></p>
+        <button class="btn btn-primary btn-block" id="submitBtn" data-action="submitBooking">提交预约</button>
+      </div>
+
+      <div class="card" id="myBookingsCard" hidden>
+        <h2 class="card-title">本户未来预约 <span class="pill" id="myCountPill">0/2</span></h2>
+        <div id="myBookings"></div>
+      </div>
+
+      <div class="card rules">
+        <h2 class="card-title">预约规则</h2>
+        <ul>
+          <li>每户最多保留 <b>2 个</b>未来有效预约；</li>
+          <li>请在所选时段结束后 <b>2 小时内</b>取餐并向管理员索要六位码核销；</li>
+          <li>超时未核销，格子<b>自动释放</b>给其他住户，超时记录保留给管理员；</li>
+          <li>新预约不会覆盖任何已有预约，只能选择空闲格子。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ========== 取餐核销页 ========== -->
+    <section class="page" id="page-pickup" hidden>
+      <div class="card text-center">
+        <div class="pickup-icon">🍱</div>
+        <h2 class="card-title">取餐核销</h2>
+        <p class="hint">取餐时请向管理员索要 <b>六位取餐码</b>，输入后完成核销并释放格子。</p>
+        <input id="pickCode" class="code-input" type="text" inputmode="numeric" maxlength="6"
+               placeholder="• • • • • •" autocomplete="off" />
+        <button class="btn btn-primary btn-block" id="pickBtn" data-action="pickupRedeem">核销取餐</button>
+        <div id="pickResult"></div>
+      </div>
+    </section>
+
+    <!-- ========== 管理员页 ========== -->
+    <section class="page" id="page-admin" hidden>
+      <!-- 登录 -->
+      <div class="card text-center" id="adminLoginCard">
+        <div class="pickup-icon">🔐</div>
+        <h2 class="card-title">管理员登录</h2>
+        <input id="adminPin" class="code-input" type="password" inputmode="numeric" maxlength="6"
+               placeholder="请输入六位管理码" autocomplete="off" />
+        <button class="btn btn-primary btn-block" data-action="adminLogin">进入管理台</button>
+        <p class="hint">默认管理码 8888，登录后可修改</p>
+      </div>
+
+      <!-- 管理台 -->
+      <div id="adminPanel" hidden>
+        <div class="stat-grid" id="statGrid"></div>
+
+        <div class="card">
+          <div class="list-head">
+            <h2 class="card-title" style="margin:0">预约记录</h2>
+            <button class="btn btn-ghost btn-sm" data-action="adminLogout">退出登录</button>
+          </div>
+          <div class="chips" id="filterChips"></div>
+          <div id="adminList"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">柜层容量设置</h2>
+          <div class="field-row">
+            <div class="field">
+              <label for="setFridge">冷藏格数</label>
+              <input id="setFridge" type="number" min="1" max="99" />
+            </div>
+            <div class="field">
+              <label for="setFreezer">冷冻格数</label>
+              <input id="setFreezer" type="number" min="1" max="99" />
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" data-action="saveCaps">保存容量</button>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">修改管理码</h2>
+          <div class="field">
+            <label for="oldPin">原管理码</label>
+            <input id="oldPin" type="password" inputmode="numeric" maxlength="6" placeholder="六位原管理码" />
+          </div>
+          <div class="field">
+            <label for="newPin">新管理码</label>
+            <input id="newPin" type="password" inputmode="numeric" maxlength="6" placeholder="六位新管理码" />
+          </div>
+          <button class="btn btn-primary btn-block" data-action="changePin">修改管理码</button>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">数据管理（本地存储）</h2>
+          <p class="hint">数据保存在本设备浏览器中。更换设备时可导出 JSON 备份，再到另一台设备导入。</p>
+          <div class="btn-row">
+            <button class="btn btn-ghost" data-action="exportData">导出数据</button>
+            <button class="btn btn-ghost" data-action="importData">导入数据</button>
+            <button class="btn btn-ghost" data-action="seedData">生成演示数据</button>
+            <button class="btn btn-danger-ghost" data-action="clearData">清空全部数据</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json,.json" hidden />
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab" data-nav="booking"><span>📅</span>预约</button>
+    <button class="tab" data-nav="pickup"><span>🍱</span>取餐</button>
+    <button class="tab" data-nav="admin"><span>🛠️</span>管理</button>
+  </nav>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
